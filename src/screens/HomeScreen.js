@@ -1,20 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { 
   View, 
-  Text, 
   StyleSheet, 
   ScrollView,
   Alert,
-  SafeAreaView,
-  TouchableOpacity,
-  TextInput as RNTextInput,
   FlatList,
-  Modal
 } from 'react-native';
-import { theme } from '../theme';
+import { 
+  Text, 
+  Button, 
+  Card, 
+  TextInput, 
+  Portal, 
+  Modal, 
+  List, 
+  Chip,
+  Surface,
+  useTheme
+} from 'react-native-paper';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import TopAppBar from '../components/TopAppBar';
 import { expoDbManager } from '../database/expo-manager';
 
 const HomeScreen = () => {
+  const theme = useTheme();
+  
   // Estados para dados
   const [reasons, setReasons] = useState([]);
   const [products, setProducts] = useState([]);
@@ -172,42 +182,32 @@ const HomeScreen = () => {
 
   // Render item do dropdown de motivos
   const renderReasonItem = ({ item }) => (
-    <TouchableOpacity
-      style={styles.dropdownItem}
+    <List.Item
+      title={item.description}
+      description={item.code}
       onPress={() => selectReason(item)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.dropdownItemText}>{item.description}</Text>
-      <Text style={styles.dropdownItemCode}>{item.code}</Text>
-    </TouchableOpacity>
+      style={styles.listItem}
+    />
   );
 
   // Render item das sugestões de produtos
   const renderProductSuggestion = ({ item }) => (
-    <TouchableOpacity
-      style={styles.suggestionItem}
+    <List.Item
+      title={item.product_name}
+      description={`(${item.product_code})`}
       onPress={() => selectProduct(item)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.suggestionName}>{item.product_name}</Text>
-      <Text style={styles.suggestionCode}>({item.product_code})</Text>
-    </TouchableOpacity>
+      style={styles.listItem}
+    />
   );
+
+  const isFormValid = selectedReason && code.trim() && quantity.trim();
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* TopAppBar */}
-      <View style={styles.topBar}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={handleMenuPress}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.menuIcon}>☰</Text>
-        </TouchableOpacity>
-        <Text style={styles.title}>Inventário</Text>
-        <View style={styles.spacer} />
-      </View>
+      <TopAppBar 
+        title="Inventário" 
+        onMenuPress={handleMenuPress}
+      />
 
       <ScrollView 
         style={styles.content}
@@ -216,156 +216,156 @@ const HomeScreen = () => {
       >
         {/* Botões Importar e Exportar */}
         <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={styles.actionButton}
+          <Button
+            mode="contained"
             onPress={handleImport}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>Importar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
             style={styles.actionButton}
-            onPress={handleExport}
-            activeOpacity={0.8}
+            contentStyle={styles.buttonContent}
           >
-            <Text style={styles.buttonText}>Exportar</Text>
-          </TouchableOpacity>
+            Importar
+          </Button>
+          <Button
+            mode="contained"
+            onPress={handleExport}
+            style={styles.actionButton}
+            contentStyle={styles.buttonContent}
+          >
+            Exportar
+          </Button>
         </View>
 
         {/* Card principal com formulário */}
-        <View style={styles.formCard}>
-          {/* Campo Motivo - Dropdown */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Motivo</Text>
-            <TouchableOpacity
-              style={[styles.textInput, styles.dropdownButton]}
-              onPress={() => setShowReasonDropdown(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={[
-                styles.dropdownButtonText,
-                !selectedReason && styles.placeholderText
-              ]}>
+        <Card mode="elevated" style={styles.formCard}>
+          <Card.Content>
+            {/* Campo Motivo - Dropdown */}
+            <View style={styles.inputContainer}>
+              <Text variant="labelMedium" style={styles.inputLabel}>Motivo</Text>
+              <Button
+                mode="outlined"
+                onPress={() => setShowReasonDropdown(true)}
+                style={styles.dropdownButton}
+                contentStyle={styles.dropdownButtonContent}
+              >
                 {selectedReason ? selectedReason.description : 'Selecione um motivo'}
-              </Text>
-              <Text style={styles.dropdownArrow}>▼</Text>
-            </TouchableOpacity>
-          </View>
+              </Button>
+              {selectedReason && (
+                <Chip 
+                  icon="check" 
+                  style={styles.selectedChip}
+                  onClose={() => setSelectedReason(null)}
+                >
+                  {selectedReason.description}
+                </Chip>
+              )}
+            </View>
 
-          {/* Campo Código - com Autocomplete */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Código</Text>
-            <RNTextInput
-              style={styles.textInput}
-              value={code}
-              onChangeText={handleCodeChange}
-              placeholder="Digite o código do produto"
-              placeholderTextColor="#999"
-              onFocus={() => {
-                if (filteredProducts.length > 0) {
-                  setShowProductSuggestions(true);
-                }
-              }}
-            />
-            
-            {/* Lista de sugestões de produtos */}
-            {showProductSuggestions && filteredProducts.length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                {filteredProducts.slice(0, 5).map((item) => (
-                  <TouchableOpacity
-                    key={item.product_code}
-                    style={styles.suggestionItem}
-                    onPress={() => selectProduct(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.suggestionName}>{item.product_name}</Text>
-                    <Text style={styles.suggestionCode}>({item.product_code})</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </View>
+            {/* Campo Código - com Autocomplete */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                label="Código"
+                value={code}
+                onChangeText={handleCodeChange}
+                placeholder="Digite o código do produto"
+                mode="outlined"
+                style={styles.textInput}
+                onFocus={() => {
+                  if (filteredProducts.length > 0) {
+                    setShowProductSuggestions(true);
+                  }
+                }}
+              />
+              
+              {/* Lista de sugestões de produtos */}
+              {showProductSuggestions && filteredProducts.length > 0 && (
+                <Surface style={styles.suggestionsContainer} elevation={2}>
+                  {filteredProducts.slice(0, 5).map((item) => (
+                    <List.Item
+                      key={item.product_code}
+                      title={item.product_name}
+                      description={`(${item.product_code})`}
+                      onPress={() => selectProduct(item)}
+                      style={styles.suggestionItem}
+                    />
+                  ))}
+                </Surface>
+              )}
+            </View>
 
-          {/* Informações do produto */}
-          <View style={styles.productInfo}>
-            <Text style={styles.productInfoText}>
-              Nome: {selectedProduct ? selectedProduct.product_name : 'NÃO CADASTRADO'}
-            </Text>
-            <Text style={styles.productInfoText}>
-              Embalagem: {selectedProduct ? selectedProduct.unit_type : 'NÃO CADASTRADO'}
-            </Text>
-            <Text style={styles.productInfoText}>
-              Preço: {selectedProduct ? `R$ ${selectedProduct.regular_price?.toFixed(2).replace('.', ',')}` : 'NÃO CADASTRADO'}
-            </Text>
-          </View>
+            {/* Informações do produto */}
+            <Card mode="outlined" style={styles.productInfoCard}>
+              <Card.Content>
+                <Text variant="titleSmall" style={styles.productInfoTitle}>
+                  Informações do Produto
+                </Text>
+                <Text variant="bodyMedium">
+                  Nome: {selectedProduct ? selectedProduct.product_name : 'NÃO CADASTRADO'}
+                </Text>
+                <Text variant="bodyMedium">
+                  Embalagem: {selectedProduct ? selectedProduct.unit_type : 'NÃO CADASTRADO'}
+                </Text>
+                <Text variant="bodyMedium">
+                  Preço: {selectedProduct ? `R$ ${selectedProduct.regular_price?.toFixed(2).replace('.', ',')}` : 'NÃO CADASTRADO'}
+                </Text>
+              </Card.Content>
+            </Card>
 
-          {/* Campo Quantidade */}
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Quantidade</Text>
-            <RNTextInput
-              style={styles.textInput}
-              value={quantity}
-              onChangeText={setQuantity}
-              placeholder="Digite a quantidade"
-              placeholderTextColor="#999"
-              keyboardType="numeric"
-            />
-          </View>
-        </View>
+            {/* Campo Quantidade */}
+            <View style={styles.inputContainer}>
+              <TextInput
+                label="Quantidade"
+                value={quantity}
+                onChangeText={setQuantity}
+                placeholder="Digite a quantidade"
+                mode="outlined"
+                keyboardType="numeric"
+                style={styles.textInput}
+              />
+            </View>
+          </Card.Content>
+        </Card>
 
         {/* Botão Salvar */}
         <View style={styles.saveButtonContainer}>
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              (!selectedReason || !code.trim() || !quantity.trim()) && styles.saveButtonDisabled
-            ]}
+          <Button
+            mode="contained"
             onPress={handleSave}
-            disabled={!selectedReason || !code.trim() || !quantity.trim()}
-            activeOpacity={0.8}
+            disabled={!isFormValid}
+            style={styles.saveButton}
+            contentStyle={styles.saveButtonContent}
           >
-            <Text style={[
-              styles.saveButtonText,
-              (!selectedReason || !code.trim() || !quantity.trim()) && styles.saveButtonTextDisabled
-            ]}>
-              Salvar
-            </Text>
-          </TouchableOpacity>
+            Salvar
+          </Button>
         </View>
       </ScrollView>
 
       {/* Modal do Dropdown de Motivos */}
-      <Modal
-        visible={showReasonDropdown}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowReasonDropdown(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowReasonDropdown(false)}
+      <Portal>
+        <Modal
+          visible={showReasonDropdown}
+          onDismiss={() => setShowReasonDropdown(false)}
+          contentContainerStyle={styles.modalContainer}
         >
-          <View style={styles.dropdownModal}>
-            <View style={styles.dropdownHeader}>
-              <Text style={styles.dropdownTitle}>Selecione um Motivo</Text>
-              <TouchableOpacity
-                onPress={() => setShowReasonDropdown(false)}
-                style={styles.closeButton}
-              >
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-            </View>
+          <Surface style={styles.modalSurface}>
+            <Text variant="headlineSmall" style={styles.modalTitle}>
+              Selecione um Motivo
+            </Text>
             <FlatList
               data={reasons}
               renderItem={renderReasonItem}
               keyExtractor={(item) => item.id.toString()}
-              style={styles.dropdownList}
+              style={styles.modalList}
               showsVerticalScrollIndicator={false}
             />
-          </View>
-        </TouchableOpacity>
-      </Modal>
+            <Button
+              mode="outlined"
+              onPress={() => setShowReasonDropdown(false)}
+              style={styles.modalCloseButton}
+            >
+              Fechar
+            </Button>
+          </Surface>
+        </Modal>
+      </Portal>
     </SafeAreaView>
   );
 };
@@ -373,44 +373,6 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  
-  // TopBar
-  topBar: {
-    height: 56,
-    backgroundColor: theme.colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: theme.spacing.md,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  menuButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-  },
-  menuIcon: {
-    fontSize: 20,
-    color: theme.colors.onPrimary,
-    fontWeight: '600',
-  },
-  title: {
-    flex: 1,
-    fontSize: theme.typography.sizes.headlineSmall,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.onPrimary,
-    fontFamily: theme.typography.fontFamily,
-    marginLeft: theme.spacing.md,
-  },
-  spacer: {
-    width: 40,
   },
   
   // Content
@@ -418,222 +380,104 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingBottom: theme.spacing.xl,
+    paddingBottom: 24,
   },
   
   // Botões superiores
   buttonRow: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    gap: theme.spacing.md,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 16,
   },
   actionButton: {
     flex: 1,
-    height: 48,
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 2,
   },
-  buttonText: {
-    color: theme.colors.onPrimary,
-    fontSize: theme.typography.sizes.labelLarge,
-    fontWeight: theme.typography.weights.medium,
-    fontFamily: theme.typography.fontFamily,
+  buttonContent: {
+    height: 48,
   },
 
   // Card do formulário
   formCard: {
-    marginHorizontal: theme.spacing.md,
-    marginTop: theme.spacing.md,
-    padding: theme.spacing.md,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
+    marginHorizontal: 16,
+    marginTop: 16,
   },
   
   // Inputs
   inputContainer: {
-    marginVertical: theme.spacing.sm,
-    zIndex: 1,
+    marginVertical: 8,
   },
   inputLabel: {
-    fontSize: theme.typography.sizes.bodyMedium,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
     marginBottom: 4,
   },
   textInput: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: theme.colors.outline,
-    borderRadius: theme.borderRadius.sm,
-    paddingHorizontal: theme.spacing.md,
-    fontSize: theme.typography.sizes.bodyLarge,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: 'transparent',
   },
 
   // Dropdown de motivos
   dropdownButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
-  dropdownButtonText: {
-    fontSize: theme.typography.sizes.bodyLarge,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
-    flex: 1,
+  dropdownButtonContent: {
+    height: 48,
+    justifyContent: 'flex-start',
   },
-  placeholderText: {
-    color: '#999',
-  },
-  dropdownArrow: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-  },
-
-  // Modal do dropdown
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dropdownModal: {
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.md,
-    width: '80%',
-    maxHeight: '60%',
-    elevation: 8,
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.outline,
-  },
-  dropdownTitle: {
-    fontSize: theme.typography.sizes.titleMedium,
-    fontWeight: theme.typography.weights.medium,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
-  },
-  closeButton: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeButtonText: {
-    fontSize: 18,
-    color: theme.colors.textSecondary,
-  },
-  dropdownList: {
-    maxHeight: 300,
-  },
-  dropdownItem: {
-    padding: theme.spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.outline,
-  },
-  dropdownItemText: {
-    fontSize: theme.typography.sizes.bodyLarge,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
-  },
-  dropdownItemCode: {
-    fontSize: theme.typography.sizes.bodySmall,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily,
-    marginTop: 2,
+  selectedChip: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
 
   // Sugestões de produtos
   suggestionsContainer: {
-    position: 'absolute',
-    top: 72,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.outline,
-    borderRadius: theme.borderRadius.sm,
-    elevation: 4,
-    zIndex: 1000,
-  },
-  suggestionsList: {
-    maxHeight: 150,
+    marginTop: 4,
+    borderRadius: 8,
+    maxHeight: 200,
   },
   suggestionItem: {
-    padding: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.outline,
-  },
-  suggestionName: {
-    fontSize: theme.typography.sizes.bodyMedium,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
-  },
-  suggestionCode: {
-    fontSize: theme.typography.sizes.bodySmall,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily,
+    paddingVertical: 8,
   },
 
   // Informações do produto
-  productInfo: {
-    paddingVertical: theme.spacing.md,
+  productInfoCard: {
+    marginVertical: 8,
   },
-  productInfoText: {
-    fontSize: theme.typography.sizes.bodyLarge,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily,
-    lineHeight: 24,
-    marginBottom: theme.spacing.xs,
+  productInfoTitle: {
+    marginBottom: 8,
   },
 
-  // Botão Salvar
+  // Botão salvar
   saveButtonContainer: {
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingTop: 16,
   },
   saveButton: {
-    minWidth: 200,
+    marginTop: 8,
+  },
+  saveButtonContent: {
     height: 48,
-    backgroundColor: theme.colors.surface,
-    borderRadius: theme.borderRadius.xl,
-    elevation: 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
   },
-  saveButtonDisabled: {
-    backgroundColor: '#ccc',
-    elevation: 1,
+
+  // Modal
+  modalContainer: {
+    margin: 20,
   },
-  saveButtonText: {
-    color: theme.colors.primary,
-    fontSize: theme.typography.sizes.labelLarge,
-    fontWeight: theme.typography.weights.medium,
-    fontFamily: theme.typography.fontFamily,
+  modalSurface: {
+    padding: 20,
+    borderRadius: 12,
+    maxHeight: '80%',
   },
-  saveButtonTextDisabled: {
-    color: '#999',
+  modalTitle: {
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  modalList: {
+    maxHeight: 300,
+  },
+  modalCloseButton: {
+    marginTop: 16,
+  },
+  listItem: {
+    paddingVertical: 8,
   },
 });
 

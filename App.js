@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { Provider } from '@react-native-material/core';
+import { PaperProvider } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Alert } from 'react-native';
-import { materialTheme } from './src/theme';
+import { theme } from './src/theme/md3-theme';
 import HomeScreen from './src/screens/HomeScreen';
 import { expoDbManager } from './src/database/expo-manager';
 
@@ -27,9 +28,11 @@ export default function App() {
   }, []);
 
   return (
-    <Provider theme={materialTheme}>
-      <StatusBar style="light" backgroundColor="#6200EE" />
-      <HomeScreen />
-    </Provider>
+    <SafeAreaProvider>
+      <PaperProvider theme={theme}>
+        <StatusBar style="auto" backgroundColor={theme.colors.surface} />
+        <HomeScreen />
+      </PaperProvider>
+    </SafeAreaProvider>
   );
 }

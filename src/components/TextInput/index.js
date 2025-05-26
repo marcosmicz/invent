@@ -1,7 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { TextInput as MaterialTextInput } from '@react-native-material/core';
-import { theme } from '../../theme';
+import { TextInput as PaperTextInput } from 'react-native-paper';
 
 const TextInput = ({ 
   label,
@@ -9,18 +8,19 @@ const TextInput = ({
   onChangeText,
   placeholder,
   style,
-  variant = "outlined",
+  mode = "outlined",
+  error,
   ...props 
 }) => {
   return (
-    <MaterialTextInput
+    <PaperTextInput
       label={label}
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
-      variant={variant}
+      mode={mode}
       style={[styles.textInput, style]}
-      color={theme.colors.primary}
+      error={error}
       {...props}
     />
   );
@@ -28,12 +28,7 @@ const TextInput = ({
 
 const styles = StyleSheet.create({
   textInput: {
-    height: theme.components.textInput.height,
-    backgroundColor: theme.components.textInput.backgroundColor,
-    borderRadius: theme.components.textInput.borderRadius,
-    fontSize: theme.components.textInput.fontSize,
-    color: theme.components.textInput.color,
-    marginVertical: theme.spacing.sm,
+    marginVertical: 8,
   },
 });
 
