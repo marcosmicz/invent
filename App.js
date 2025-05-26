@@ -1,21 +1,35 @@
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Provider } from '@react-native-material/core';
+import { Alert } from 'react-native';
+import { materialTheme } from './src/theme';
+import HomeScreen from './src/screens/HomeScreen';
+import { expoDbManager } from './src/database/expo-manager';
 
 export default function App() {
+  // Inicializar banco de dados quando app carrega
+  useEffect(() => {
+    const initializeApp = async () => {
+      try {
+        console.log('Inicializando aplicativo...');
+        await expoDbManager.initialize();
+        console.log('Aplicativo inicializado com sucesso');
+      } catch (error) {
+        console.error('Erro ao inicializar aplicativo:', error);
+        Alert.alert(
+          'Erro de Inicialização',
+          'Falha ao inicializar o banco de dados. O app pode não funcionar corretamente.'
+        );
+      }
+    };
+
+    initializeApp();
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <Provider theme={materialTheme}>
+      <StatusBar style="light" backgroundColor="#6200EE" />
+      <HomeScreen />
+    </Provider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
