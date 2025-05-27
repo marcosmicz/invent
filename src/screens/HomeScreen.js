@@ -14,6 +14,7 @@ import {
 import { theme } from '../theme';
 import { expoDbManager } from '../database/expo-manager';
 import ProductAutocompleteInput from '../components/ProductAutocompleteInput';
+import { exportService } from '../services/ExportService';
 
 const HomeScreen = () => {
   // Estados para dados
@@ -129,8 +130,29 @@ const HomeScreen = () => {
     Alert.alert('Importar', 'Funcionalidade de importação será implementada');
   };
 
-  const handleExport = () => {
-    Alert.alert('Exportar', 'Funcionalidade de exportação será implementada');
+  const handleExport = async () => {
+    Alert.alert(
+      'Exportar Dados',
+      'Deseja exportar todos os dados não sincronizados para arquivos .txt organizados por motivo?',
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel'
+        },
+        {
+          text: 'Exportar',
+          onPress: async () => {
+            try {
+              console.log('HOMESCREEN: Iniciando exportação...');
+              await exportService.exportData();
+            } catch (error) {
+              console.error('HOMESCREEN: Erro na exportação:', error);
+              // O ExportService já exibe o alerta de erro
+            }
+          }
+        }
+      ]
+    );
   };
 
   const handleMenuPress = () => {

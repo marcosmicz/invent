@@ -91,6 +91,7 @@ class ExpoSQLiteManager {
         unit_cost REAL DEFAULT 0.0,
         total_cost REAL DEFAULT 0.0,
         notes TEXT,
+        is_synchronized INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (reason_id) REFERENCES reasons (id)
       )`,
@@ -351,6 +352,126 @@ class ExpoSQLiteManager {
     } catch (error) {
       console.error('EXPO-SQLITE: Erro ao resetar database:', error);
       throw error;
+    }
+  }
+
+  /**
+   * Buscar entradas não sincronizadas por motivo
+   */
+  async getUnsynchronizedEntriesByReason(reasonId) {
+    try {
+      const db = await this.getDatabase();
+      const [results] = await executeSqlSafe(db,
+        `SELECT * FROM entries 
+         WHERE reason_id = ? AND (is_synchronized = 0 OR is_synchronized IS NULL)
+         ORDER BY created_at ASC`,
+        [reasonId]
+      );
+      
+      const data = [];
+      if (results.rows._array) {
+        data.push(...results.rows._array);
+      } else {
+        for (let i = 0; i < results.rows.length; i++) {
+          data.push(results.rows.item(i));
+        }
+      }
+      
+      return data;
+    } catch (error) {
+      console.error('EXPO-SQLITE: Erro ao buscar entradas não sincronizadas:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Marcar entradas como sincronizadas
+   */
+  async markEntriesAsSynchronized(entryIds) {
+    if (!entryIds || entryIds.length === 0) return;
+    
+    try {
+      const db = await this.getDatabase();
+      const placeholders = entryIds.map(() => '?').join(',');
+      
+      await executeSqlSafe(db,
+        `UPDATE entries SET is_synchronized = 1 WHERE id IN (${placeholders})`,
+        entryIds
+      );
+      
+      console.log(`EXPO-SQLITE: ${entryIds.length} entradas marcadas como sincronizadas`);
+    } catch (error) {
+      console.error('EXPO-SQLITE: Erro ao marcar entradas como sincronizadas:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Atualizar campo is_synchronized para registros existentes (migração)
+   */
+  async migrateExistingEntries() {
+    try {
+      const db = await this.getDatabase();
+      
+      // Verificar se existe a coluna is_synchronized usando uma abordagem mais robusta
+      console.log('EXPO-SQLITE: Executando SQL: PRAGMA table_info(entries)...');
+      const [columns] = await executeSqlSafe(db, "PRAGMA table_info(entries)");
+      
+      const hasColumn = [];
+      
+      // Verificar formato de retorno do expo-sqlite
+      if (columns.rows._array) {
+        hasColumn.push(...columns.rows._array);
+      } else if (columns.rows.length) {
+        for (let i = 0; i < columns.rows.length; i++) {
+          hasColumn.push(columns.rows.item(i));
+        }
+      }
+      
+      console.log('EXPO-SQLITE: Colunas encontradas:', hasColumn.length);
+      
+      const columnExists = hasColumn.some(col => col.name === 'is_synchronized');
+      
+      if (!columnExists) {
+        console.log('EXPO-SQLITE: Coluna is_synchronized não encontrada, adicionando...');
+        // Adicionar coluna se não existir
+        await executeSqlSafe(db, 'ALTER TABLE entries ADD COLUMN is_synchronized INTEGER DEFAULT 0');
+        console.log('EXPO-SQLITE: Coluna is_synchronized adicionada à tabela entries');
+      } else {
+        console.log('EXPO-SQLITE: Coluna is_synchronized já existe');
+      }
+      
+      // Garantir que registros existentes tenham valor 0
+      await executeSqlSafe(db, 
+        'UPDATE entries SET is_synchronized = 0 WHERE is_synchronized IS NULL'
+      );
+      
+      console.log('EXPO-SQLITE: Migração concluída com sucesso');
+      
+    } catch (error) {
+      console.error('EXPO-SQLITE: Erro na migração:', error);
+      
+      // Se falhar, tentar adicionar a coluna sem verificação
+      try {
+        console.log('EXPO-SQLITE: Tentando adicionar coluna sem verificação...');
+        const db = await this.getDatabase();
+        await executeSqlSafe(db, 'ALTER TABLE entries ADD COLUMN is_synchronized INTEGER DEFAULT 0');
+        console.log('EXPO-SQLITE: Coluna adicionada com sucesso na segunda tentativa');
+      } catch (secondError) {
+        // Se falhar novamente, provavelmente a coluna já existe
+        console.log('EXPO-SQLITE: Coluna provavelmente já existe:', secondError.message);
+        
+        // Apenas garantir que registros existentes tenham valor 0
+        try {
+          const db = await this.getDatabase();
+          await executeSqlSafe(db, 
+            'UPDATE entries SET is_synchronized = 0 WHERE is_synchronized IS NULL'
+          );
+          console.log('EXPO-SQLITE: Valores NULL atualizados para 0');
+        } catch (updateError) {
+          console.error('EXPO-SQLITE: Erro ao atualizar valores NULL:', updateError);
+        }
+      }
     }
   }
 
