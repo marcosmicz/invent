@@ -17,10 +17,11 @@ import { expoDbManager } from '../database/expo-manager';
 import ProductAutocompleteInput from '../components/ProductAutocompleteInput';
 import { exportService } from '../services/ExportService';
 import { importService } from '../services/ImportService';
+import TextInput from '../components/TextInput';
 
-const DEFAULT_EXPORT_PATH = '/storage/emulated/0/InventExports/';
+const DEFAULT_EXPORT_PATH = `${FileSystem.cacheDirectory}Download/Invent/`;
 
-const HomeScreen = ({ storagePermissionGranted }) => {
+const HomeScreen = () => {
   // Estados para dados
   const [reasons, setReasons] = useState([]);
   
@@ -151,11 +152,6 @@ const HomeScreen = ({ storagePermissionGranted }) => {
 
   // Funções de importação e exportação
   const handleImport = async () => {
-    if (!storagePermissionGranted) {
-      Alert.alert('Erro', 'Sem permissão de acesso ao armazenamento');
-      return;
-    }
-
     if (!importFilePath.trim()) {
       Alert.alert('Erro', 'Por favor, informe o caminho do arquivo para importar');
       return;
@@ -176,11 +172,6 @@ const HomeScreen = ({ storagePermissionGranted }) => {
   };
 
   const handleExport = async () => {
-    if (!storagePermissionGranted) {
-      Alert.alert('Erro', 'Sem permissão de acesso ao armazenamento');
-      return;
-    }
-
     const path = validateAndNormalizePath(exportBasePath);
     if (!path) {
       Alert.alert('Erro', 'Por favor, insira um caminho de exportação válido');
@@ -240,7 +231,7 @@ const HomeScreen = ({ storagePermissionGranted }) => {
               style={styles.textInput}
               value={exportBasePath}
               onChangeText={handleExportPathChange}
-              placeholder={DEFAULT_EXPORT_PATH}
+              placeholder="Nome personalizado da pasta (opcional)"
               placeholderTextColor="#999"
             />
             <TouchableOpacity
@@ -253,35 +244,27 @@ const HomeScreen = ({ storagePermissionGranted }) => {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Arquivo para Importação</Text>
+            <Text style={styles.inputLabel}>Arquivo para Importação (interno)</Text>
             <RNTextInput
               style={styles.textInput}
               value={importFilePath}
               onChangeText={setImportFilePath}
-              placeholder="Digite o caminho completo do arquivo"
+              placeholder="Nome do arquivo dentro da pasta de exportação"
               placeholderTextColor="#999"
             />
           </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                !storagePermissionGranted && styles.actionButtonDisabled
-              ]}
+              style={styles.actionButton}
               onPress={handleImport}
-              disabled={!storagePermissionGranted}
               activeOpacity={0.8}
             >
               <Text style={styles.buttonText}>Importar</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[
-                styles.actionButton,
-                !storagePermissionGranted && styles.actionButtonDisabled
-              ]}
+              style={styles.actionButton}
               onPress={handleExport}
-              disabled={!storagePermissionGranted}
               activeOpacity={0.8}
             >
               <Text style={styles.buttonText}>Exportar</Text>

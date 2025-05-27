@@ -1,41 +1,88 @@
 /**
  * Serviço de Importação de Dados
- * Responsável por importar dados de inventário de arquivos .txt via acesso direto ao sistema de arquivos
+ * Responsável por importar dados de inventário de arquivos .txt usando acesso direto ao sistema de arquivos
  */
 
 import * as FileSystem from 'expo-file-system';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { expoDbManager } from '../database/expo-manager';
 
 class ImportService {
   /**
-   * Processar linha do arquivo de importação
-   * @param {string} line Linha do arquivo
-   * @returns {object} Objeto com dados da entrada
+   * Obter diretório base de acordo com a versão do Android
    */
-  parseLine(line) {
-    const [code, name, quantity, cost, date] = line.split('|');
-    
-    if (!code || !quantity || isNaN(quantity)) {
-      throw new Error('Formato de linha inválido');
+  /**
+   * Obter diretório base de importação
+   */
+  getBaseDirectory(customPath = '') {
+    // Se fornecido caminho customizado, usar ele
+    if (customPath.trim()) {
+      return customPath;
     }
 
-    return {
-      product_code: code.trim(),
-      product_name: name?.trim() || 'PRODUTO NÃO CADASTRADO',
+    // Usar diretório Download do app
+    return `${FileSystem.cacheDirectory}Download/Invent/`;
+  }
+
+  /**
+   * Validar formato do arquivo
+   */
+  validateFileContent(content) {
+    if (!content.trim()) {
+      throw new Error('Arquivo vazio');
+    }
+
+    const lines = content.trim().split('\n');
+    const invalidLines = lines.filter(line => {
+      const parts = line.split('|');
+      return parts.length !== 5 || !parts[0] || !parts[1] || isNaN(parts[2]) || isNaN(parts[3]);
+    });
+
+    if (invalidLines.length > 0) {
+      throw new Error('Formato de arquivo inválido');
+    }
+
+    return lines;
+  }
+
+  /**
+   * Processar linha do arquivo
+   */
+  async processLine(line) {
+    const [productCode, productName, quantity, unitCost, date] = line.split('|');
+
+    // Verificar se produto existe
+    let product = await expoDbManager.getProductByCode(productCode);
+    if (!product) {
+      // Criar produto se não existir
+      product = await expoDbManager.createProduct({
+        product_code: productCode,
+        product_name: productName
+      });
+    }
+
+    // Criar entrada
+    const entry = {
+      product_code: productCode,
+      product_name: productName,
       quantity: parseFloat(quantity),
-      unit_cost: parseFloat(cost) || 0,
+      unit_cost: parseFloat(unitCost),
+      total_cost: parseFloat(quantity) * parseFloat(unitCost),
+      reason_id: 1, // Motivo padrão para importação
+      notes: `Importado em ${new Date().toISOString()}`,
       created_at: date ? new Date(date) : new Date()
     };
+
+    await expoDbManager.createEntry(entry);
+    return entry;
   }
 
   /**
    * Importar dados de um arquivo
-   * @param {string} filePath Caminho completo do arquivo a ser importado
    */
   async importDataFromFile(filePath) {
-    console.log('IMPORT_SERVICE: Iniciando importação de dados...');
-
+    console.log('IMPORT_SERVICE: Iniciando importação:', filePath);
+    
     try {
       // Verificar se arquivo existe
       const fileInfo = await FileSystem.getInfoAsync(filePath);
@@ -48,46 +95,42 @@ class ImportService {
         encoding: FileSystem.EncodingType.UTF8
       });
 
-      // Processar linhas
-      const lines = content.split('\n').filter(line => line.trim());
-      
-      if (lines.length === 0) {
-        throw new Error('Arquivo vazio');
-      }
+      // Validar formato
+      const lines = this.validateFileContent(content);
+      console.log(`IMPORT_SERVICE: ${lines.length} linhas para processar`);
 
-      console.log(`IMPORT_SERVICE: Processando ${lines.length} linhas`);
-
-      // Rastrear progresso
+      // Processar cada linha
       const results = {
         totalLines: lines.length,
-        successfulImports: 0,
-        failedImports: 0,
+        processedLines: 0,
+        failedLines: 0,
         errors: []
       };
 
-      // Processar cada linha
-      for (const [index, line] of lines.entries()) {
+      for (const line of lines) {
         try {
-          const entryData = this.parseLine(line);
-          await expoDbManager.insertEntry(entryData);
-          results.successfulImports++;
+          await this.processLine(line);
+          results.processedLines++;
         } catch (error) {
-          console.error(`IMPORT_SERVICE: Erro na linha ${index + 1}:`, error);
-          results.failedImports++;
+          console.error('IMPORT_SERVICE: Erro processando linha:', error);
+          results.failedLines++;
           results.errors.push({
-            line: index + 1,
-            content: line,
+            line,
             error: error.message
           });
         }
       }
 
-      // Exibir resultados
       this.showImportResults(results);
       return results;
 
     } catch (error) {
       console.error('IMPORT_SERVICE: Erro na importação:', error);
+      Alert.alert(
+        'Erro na Importação',
+        `Falha ao importar arquivo: ${error.message}`,
+        [{ text: 'OK' }]
+      );
       throw error;
     }
   }
@@ -96,18 +139,22 @@ class ImportService {
    * Exibir resultados da importação
    */
   showImportResults(results) {
-    let message = [
+    const message = [
       `Total de linhas: ${results.totalLines}`,
-      `Importações com sucesso: ${results.successfulImports}`,
-      `Falhas na importação: ${results.failedImports}`
+      `Linhas processadas: ${results.processedLines}`,
+      `Falhas: ${results.failedLines}`
     ];
 
     if (results.errors.length > 0) {
       message.push(
         '',
         'Erros:',
-        ...results.errors.map(e => `- Linha ${e.line}: ${e.error}`)
+        ...results.errors.slice(0, 5).map(e => `- ${e.error}: ${e.line}`)
       );
+
+      if (results.errors.length > 5) {
+        message.push(`...e mais ${results.errors.length - 5} erros`);
+      }
     }
 
     Alert.alert(
@@ -118,6 +165,5 @@ class ImportService {
   }
 }
 
-// Exportar instância singleton
 export const importService = new ImportService();
 export default importService;

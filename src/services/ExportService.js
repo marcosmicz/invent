@@ -4,10 +4,26 @@
  */
 
 import * as FileSystem from 'expo-file-system';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { expoDbManager } from '../database/expo-manager';
 
 class ExportService {
+  /**
+   * Obter diretório base de acordo com a versão do Android
+   */
+  /**
+   * Obter diretório base de exportação
+   */
+  getBaseDirectory(customPath = '') {
+    // Se fornecido caminho customizado, usar ele
+    if (customPath.trim()) {
+      return customPath;
+    }
+
+    // Usar diretório Download do app
+    return `${FileSystem.cacheDirectory}Download/Invent/`;
+  }
+
   /**
    * Gerar nome do arquivo baseado no código do motivo
    */
@@ -43,38 +59,40 @@ class ExportService {
   /**
    * Realizar exportação completa de dados
    */
-  async exportData(baseExportPath) {
+  async exportData(customPath = '') {
     console.log('EXPORT_SERVICE: Iniciando exportação de dados...');
     
     try {
-      if (!baseExportPath?.trim()) {
-        throw new Error('Caminho de exportação inválido');
-      }
+      // Determinar diretório de exportação
+      const exportPath = this.getBaseDirectory(customPath);
+      console.log('EXPORT_SERVICE: Usando diretório:', exportPath);
 
-      await FileSystem.makeDirectoryAsync(baseExportPath, { 
+      // Criar diretório se não existir
+      await FileSystem.makeDirectoryAsync(exportPath, { 
         intermediates: true 
       });
       
+      // Buscar motivos
       const reasons = await expoDbManager.getReasons();
-      
       if (!reasons || reasons.length === 0) {
         throw new Error('Nenhum motivo encontrado no banco de dados');
       }
       
       console.log(`EXPORT_SERVICE: ${reasons.length} motivos encontrados`);
       
+      // Processar cada motivo
       const results = {
         totalReasons: reasons.length,
         successfulExports: 0,
         failedExports: 0,
         exportedFiles: [],
         errors: [],
-        exportPath: baseExportPath
+        exportPath
       };
       
       for (const reason of reasons) {
         try {
-          const exported = await this.exportReasonData(reason, baseExportPath);
+          const exported = await this.exportReasonData(reason, exportPath);
           if (exported) {
             results.successfulExports++;
             results.exportedFiles.push(exported);
@@ -101,10 +119,11 @@ class ExportService {
   /**
    * Exportar dados de um motivo específico
    */
-  async exportReasonData(reason, baseExportPath) {
+  async exportReasonData(reason, exportPath) {
     try {
       console.log(`EXPORT_SERVICE: Processando motivo ${reason.code}`);
       
+      // Buscar entradas não sincronizadas
       const entries = await expoDbManager.getUnsynchronizedEntriesByReason(reason.id);
       
       if (!entries || entries.length === 0) {
@@ -112,14 +131,17 @@ class ExportService {
         return null;
       }
       
+      // Gerar nome do arquivo e caminho completo
       const fileName = this.generateFileName(reason.code);
-      const filePath = `${baseExportPath}${fileName}`;
+      const filePath = `${exportPath}${fileName}`;
       
+      // Gerar conteúdo e salvar arquivo
       const fileContent = this.generateFileContent(entries);
       await FileSystem.writeAsStringAsync(filePath, fileContent, {
         encoding: FileSystem.EncodingType.UTF8
       });
       
+      // Marcar entradas como sincronizadas
       const entryIds = entries.map(entry => entry.id);
       await expoDbManager.markEntriesAsSynchronized(entryIds);
       
