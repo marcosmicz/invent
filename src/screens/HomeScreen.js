@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
+import {
+  View,
+  Text,
+  StyleSheet,
   ScrollView,
   Alert,
   SafeAreaView,
@@ -11,12 +11,16 @@ import {
   FlatList,
   Modal
 } from 'react-native';
+import * as FileSystem from 'expo-file-system';
 import { theme } from '../theme';
 import { expoDbManager } from '../database/expo-manager';
 import ProductAutocompleteInput from '../components/ProductAutocompleteInput';
 import { exportService } from '../services/ExportService';
+import { importService } from '../services/ImportService';
 
-const HomeScreen = () => {
+const DEFAULT_EXPORT_PATH = '/storage/emulated/0/InventExports/';
+
+const HomeScreen = ({ storagePermissionGranted }) => {
   // Estados para dados
   const [reasons, setReasons] = useState([]);
   
@@ -28,8 +32,28 @@ const HomeScreen = () => {
   const [code, setCode] = useState('');
   const [quantity, setQuantity] = useState('');
   
+  // Estados para caminhos de exportação/importação
+  const [exportBasePath, setExportBasePath] = useState(DEFAULT_EXPORT_PATH);
+  const [importFilePath, setImportFilePath] = useState('');
+  
   // Estados para UI
   const [showReasonDropdown, setShowReasonDropdown] = useState(false);
+
+  // Funções auxiliares
+  const validateAndNormalizePath = (path) => {
+    if (!path.trim()) return '';
+    
+    let normalizedPath = path.trim();
+    if (!normalizedPath.endsWith('/')) {
+      normalizedPath += '/';
+    }
+    
+    return normalizedPath.replace(/\/+/g, '/');
+  };
+
+  const handleExportPathChange = (text) => {
+    setExportBasePath(validateAndNormalizePath(text));
+  };
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -125,55 +149,51 @@ const HomeScreen = () => {
     }
   };
 
-  // Funções dos botões (placeholder)
-  const handleImport = () => {
-    Alert.alert('Importar', 'Funcionalidade de importação será implementada');
+  // Funções de importação e exportação
+  const handleImport = async () => {
+    if (!storagePermissionGranted) {
+      Alert.alert('Erro', 'Sem permissão de acesso ao armazenamento');
+      return;
+    }
+
+    if (!importFilePath.trim()) {
+      Alert.alert('Erro', 'Por favor, informe o caminho do arquivo para importar');
+      return;
+    }
+
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(importFilePath);
+      if (!fileInfo.exists) {
+        throw new Error('Arquivo não encontrado');
+      }
+      
+      await importService.importDataFromFile(importFilePath);
+      Alert.alert('Sucesso', 'Importação concluída com sucesso');
+    } catch (error) {
+      console.error('HOMESCREEN: Erro na importação:', error);
+      Alert.alert('Erro na Importação', error.message);
+    }
   };
 
   const handleExport = async () => {
-    // Alerta inicial sobre seleção de diretório
-    Alert.alert(
-      'Exportar Dados',
-      'Você precisará selecionar um diretório para salvar os arquivos .txt. Deseja continuar?',
-      [
-        {
-          text: 'Cancelar',
-          style: 'cancel'
-        },
-        {
-          text: 'Continuar',
-          onPress: async () => {
-            try {
-              console.log('HOMESCREEN: Iniciando exportação...');
-              await exportService.exportData();
-            } catch (error) {
-              console.error('HOMESCREEN: Erro na exportação:', error);
-              
-              // Tratamento específico por tipo de erro
-              if (error.message.includes('Permissão')) {
-                Alert.alert(
-                  'Permissão Negada',
-                  'Você precisa permitir o acesso ao diretório para salvar os arquivos.',
-                  [{ text: 'OK' }]
-                );
-              } else if (error.message.includes('cancelada')) {
-                Alert.alert(
-                  'Exportação Cancelada',
-                  'A seleção do diretório foi cancelada.',
-                  [{ text: 'OK' }]
-                );
-              } else {
-                Alert.alert(
-                  'Erro na Exportação',
-                  `Ocorreu um erro durante a exportação: ${error.message}`,
-                  [{ text: 'OK' }]
-                );
-              }
-            }
-          }
-        }
-      ]
-    );
+    if (!storagePermissionGranted) {
+      Alert.alert('Erro', 'Sem permissão de acesso ao armazenamento');
+      return;
+    }
+
+    const path = validateAndNormalizePath(exportBasePath);
+    if (!path) {
+      Alert.alert('Erro', 'Por favor, insira um caminho de exportação válido');
+      return;
+    }
+
+    try {
+      await FileSystem.makeDirectoryAsync(path, { intermediates: true });
+      await exportService.exportData(path);
+    } catch (error) {
+      console.error('HOMESCREEN: Erro na exportação:', error);
+      Alert.alert('Erro na Exportação', error.message);
+    }
   };
 
   const handleMenuPress = () => {
@@ -212,22 +232,61 @@ const HomeScreen = () => {
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Botões Importar e Exportar */}
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleImport}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>Importar</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={handleExport}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>Exportar</Text>
-          </TouchableOpacity>
+        {/* Card de Importação/Exportação */}
+        <View style={styles.formCard}>
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Caminho de Exportação</Text>
+            <RNTextInput
+              style={styles.textInput}
+              value={exportBasePath}
+              onChangeText={handleExportPathChange}
+              placeholder={DEFAULT_EXPORT_PATH}
+              placeholderTextColor="#999"
+            />
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={() => setExportBasePath(DEFAULT_EXPORT_PATH)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.resetButtonText}>Restaurar Padrão</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.inputLabel}>Arquivo para Importação</Text>
+            <RNTextInput
+              style={styles.textInput}
+              value={importFilePath}
+              onChangeText={setImportFilePath}
+              placeholder="Digite o caminho completo do arquivo"
+              placeholderTextColor="#999"
+            />
+          </View>
+
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                !storagePermissionGranted && styles.actionButtonDisabled
+              ]}
+              onPress={handleImport}
+              disabled={!storagePermissionGranted}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>Importar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.actionButton,
+                !storagePermissionGranted && styles.actionButtonDisabled
+              ]}
+              onPress={handleExport}
+              disabled={!storagePermissionGranted}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>Exportar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Card principal com formulário */}
@@ -400,11 +459,10 @@ const styles = StyleSheet.create({
     paddingBottom: theme.spacing.xl,
   },
   
-  // Botões superiores
+  // Botões de ação
   buttonRow: {
     flexDirection: 'row',
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
+    marginTop: theme.spacing.md,
     gap: theme.spacing.md,
   },
   actionButton: {
@@ -415,6 +473,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
+  },
+  actionButtonDisabled: {
+    backgroundColor: theme.colors.disabled,
+  },
+  resetButton: {
+    marginTop: 4,
+    padding: 8,
+    backgroundColor: theme.colors.surface,
+    borderRadius: theme.borderRadius.sm,
+    borderWidth: 1,
+    borderColor: theme.colors.primary,
+    alignSelf: 'flex-start',
+  },
+  resetButtonText: {
+    color: theme.colors.primary,
+    fontSize: theme.typography.sizes.bodySmall,
+    textAlign: 'center',
   },
   buttonText: {
     color: theme.colors.onPrimary,

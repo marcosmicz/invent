@@ -28,6 +28,7 @@
     "prop-types": "^15.8.1",
     "react": "19.0.0",
     "react-native": "0.79.2",
+    "react-native-manage-external-storage": "^0.1.8",
     "react-native-safe-area-context": "5.4.0",
     "react-native-sqlite-storage": "^6.0.1",
     "react-native-vector-icons": "^10.2.0"
