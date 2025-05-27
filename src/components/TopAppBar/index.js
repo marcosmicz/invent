@@ -1,9 +1,25 @@
 import React from 'react';
-import { Appbar } from 'react-native-paper';
+import { Appbar, useTheme } from 'react-native-paper';
 
 const TopAppBar = ({ title, onMenuPress, actions, ...props }) => {
+  const theme = useTheme();
+  
   return (
-    <Appbar.Header {...props}>
+    <Appbar.Header
+      {...props}
+      style={[
+        {
+          backgroundColor: theme.colors.surface,
+        },
+        props.style
+      ]}
+      theme={{
+        colors: {
+          surface: theme.colors.surface,
+          onSurface: theme.colors.onSurface,
+        }
+      }}
+    >
       {onMenuPress && (
         <Appbar.Action 
           icon="menu" 

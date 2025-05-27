@@ -28,7 +28,7 @@ const TextInput = ({
 
 const styles = StyleSheet.create({
   textInput: {
-    marginVertical: 8,
+    // Removido marginVertical para usar apenas o spacing do container pai
   },
 });
 

@@ -330,8 +330,12 @@ const HomeScreen = () => {
             mode="contained"
             onPress={handleSave}
             disabled={!isFormValid}
-            style={styles.saveButton}
+            style={[
+              styles.saveButton,
+              { backgroundColor: theme.colors.primary }
+            ]}
             contentStyle={styles.saveButtonContent}
+            labelStyle={{ color: theme.colors.onPrimary }}
           >
             Salvar
           </Button>
@@ -405,7 +409,7 @@ const styles = StyleSheet.create({
   
   // Inputs
   inputContainer: {
-    marginVertical: 8,
+    marginVertical: 4, // Reduzido de 8 para 4
   },
   inputLabel: {
     marginBottom: 4,
@@ -423,7 +427,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   selectedChip: {
-    marginTop: 8,
+    marginTop: 4, // Reduzido de 8 para 4
     alignSelf: 'flex-start',
   },
 
@@ -434,15 +438,15 @@ const styles = StyleSheet.create({
     maxHeight: 200,
   },
   suggestionItem: {
-    paddingVertical: 8,
+    paddingVertical: 4, // Reduzido de 8 para 4
   },
 
   // Informações do produto
   productInfoCard: {
-    marginVertical: 8,
+    marginVertical: 4, // Reduzido de 8 para 4
   },
   productInfoTitle: {
-    marginBottom: 8,
+    marginBottom: 4, // Reduzido de 8 para 4
   },
 
   // Botão salvar
@@ -452,6 +456,7 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     marginTop: 8,
+    backgroundColor: 'transparent', // Remove background para usar cor do tema
   },
   saveButtonContent: {
     height: 48,
@@ -477,7 +482,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   listItem: {
-    paddingVertical: 8,
+    paddingVertical: 4, // Reduzido de 8 para 4
   },
 });
 
