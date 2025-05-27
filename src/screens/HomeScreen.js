@@ -131,23 +131,44 @@ const HomeScreen = () => {
   };
 
   const handleExport = async () => {
+    // Alerta inicial sobre seleção de diretório
     Alert.alert(
       'Exportar Dados',
-      'Deseja exportar todos os dados não sincronizados para arquivos .txt organizados por motivo?',
+      'Você precisará selecionar um diretório para salvar os arquivos .txt. Deseja continuar?',
       [
         {
           text: 'Cancelar',
           style: 'cancel'
         },
         {
-          text: 'Exportar',
+          text: 'Continuar',
           onPress: async () => {
             try {
               console.log('HOMESCREEN: Iniciando exportação...');
               await exportService.exportData();
             } catch (error) {
               console.error('HOMESCREEN: Erro na exportação:', error);
-              // O ExportService já exibe o alerta de erro
+              
+              // Tratamento específico por tipo de erro
+              if (error.message.includes('Permissão')) {
+                Alert.alert(
+                  'Permissão Negada',
+                  'Você precisa permitir o acesso ao diretório para salvar os arquivos.',
+                  [{ text: 'OK' }]
+                );
+              } else if (error.message.includes('cancelada')) {
+                Alert.alert(
+                  'Exportação Cancelada',
+                  'A seleção do diretório foi cancelada.',
+                  [{ text: 'OK' }]
+                );
+              } else {
+                Alert.alert(
+                  'Erro na Exportação',
+                  `Ocorreu um erro durante a exportação: ${error.message}`,
+                  [{ text: 'OK' }]
+                );
+              }
             }
           }
         }
@@ -170,7 +191,6 @@ const HomeScreen = () => {
       <Text style={styles.dropdownItemCode}>{item.code}</Text>
     </TouchableOpacity>
   );
-
 
   return (
     <SafeAreaView style={styles.container}>
@@ -499,69 +519,68 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
   },
   dropdownList: {
-    maxHeight: 300,
+    maxHeight: '100%',
   },
   dropdownItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: theme.spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.outline,
   },
   dropdownItemText: {
+    flex: 1,
     fontSize: theme.typography.sizes.bodyLarge,
     color: theme.colors.textPrimary,
     fontFamily: theme.typography.fontFamily,
   },
   dropdownItemCode: {
-    fontSize: theme.typography.sizes.bodySmall,
+    fontSize: theme.typography.sizes.bodyMedium,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily,
-    marginTop: 2,
+    marginLeft: theme.spacing.sm,
   },
-
 
   // Informações do produto
   productInfo: {
-    paddingVertical: theme.spacing.md,
+    marginVertical: theme.spacing.sm,
+    padding: theme.spacing.sm,
+    backgroundColor: theme.colors.surfaceVariant,
+    borderRadius: theme.borderRadius.sm,
   },
   productInfoText: {
-    fontSize: theme.typography.sizes.bodyLarge,
+    fontSize: theme.typography.sizes.bodyMedium,
     color: theme.colors.textSecondary,
     fontFamily: theme.typography.fontFamily,
-    lineHeight: 24,
-    marginBottom: theme.spacing.xs,
+    marginVertical: 2,
   },
 
   // Botão Salvar
   saveButtonContainer: {
-    paddingHorizontal: theme.spacing.md,
-    paddingTop: theme.spacing.md,
-    alignItems: 'center',
+    marginHorizontal: theme.spacing.md,
+    marginTop: theme.spacing.lg,
   },
   saveButton: {
-    minWidth: 200,
     height: 48,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.primary,
     borderRadius: theme.borderRadius.xl,
-    elevation: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    elevation: 2,
   },
   saveButtonDisabled: {
-    backgroundColor: '#ccc',
-    elevation: 1,
+    backgroundColor: theme.colors.surfaceVariant,
+    elevation: 0,
   },
   saveButtonText: {
-    color: theme.colors.primary,
+    color: theme.colors.onPrimary,
     fontSize: theme.typography.sizes.labelLarge,
     fontWeight: theme.typography.weights.medium,
     fontFamily: theme.typography.fontFamily,
   },
   saveButtonTextDisabled: {
-    color: '#999',
+    color: theme.colors.onSurfaceVariant,
   },
 });
 

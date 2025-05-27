@@ -1,6 +1,6 @@
 /**
  * Serviço de Exportação de Dados
- * Responsável por exportar dados de inventário para arquivos .txt organizados por motivo
+ * Responsável por exportar dados de inventário para arquivos .txt usando Storage Access Framework
  */
 
 import * as FileSystem from 'expo-file-system';
@@ -15,6 +15,17 @@ class ExportService {
     console.log('EXPORT_SERVICE: Iniciando exportação de dados...');
     
     try {
+      // Solicitar permissão e selecionar diretório via SAF
+      const permissionResult = await FileSystem.StorageAccessFramework
+        .requestDirectoryPermissionsAsync();
+      
+      if (!permissionResult.granted) {
+        throw new Error('Permissão de acesso ao diretório negada');
+      }
+      
+      const dirUri = permissionResult.directoryUri;
+      console.log(`EXPORT_SERVICE: Diretório selecionado: ${dirUri}`);
+      
       // Realizar migração se necessário
       await expoDbManager.migrateExistingEntries();
       
@@ -27,21 +38,19 @@ class ExportService {
       
       console.log(`EXPORT_SERVICE: ${reasons.length} motivos encontrados`);
       
-      // Criar estrutura de diretórios base
-      await this.createBaseDirectories();
-      
       // Processar cada motivo independentemente
       const results = {
         totalReasons: reasons.length,
         successfulExports: 0,
         failedExports: 0,
         exportedFiles: [],
-        errors: []
+        errors: [],
+        directoryUri: dirUri
       };
       
       for (const reason of reasons) {
         try {
-          const exported = await this.exportReasonData(reason);
+          const exported = await this.exportReasonData(reason, dirUri);
           if (exported) {
             results.successfulExports++;
             results.exportedFiles.push(exported);
@@ -73,40 +82,9 @@ class ExportService {
   }
   
   /**
-   * Criar estrutura base de diretórios
-   */
-  async createBaseDirectories() {
-    try {
-      const documentsDir = FileSystem.documentDirectory;
-      const baseDir = `${documentsDir}inventario/`;
-      const motivosDir = `${baseDir}motivos/`;
-      
-      // Verificar e criar diretório inventario
-      const baseDirInfo = await FileSystem.getInfoAsync(baseDir);
-      if (!baseDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(baseDir, { intermediates: true });
-        console.log('EXPORT_SERVICE: Diretório inventario/ criado');
-      }
-      
-      // Verificar e criar diretório motivos
-      const motivosDirInfo = await FileSystem.getInfoAsync(motivosDir);
-      if (!motivosDirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(motivosDir, { intermediates: true });
-        console.log('EXPORT_SERVICE: Diretório motivos/ criado');
-      }
-      
-      return motivosDir;
-      
-    } catch (error) {
-      console.error('EXPORT_SERVICE: Erro ao criar diretórios base:', error);
-      throw new Error(`Falha ao criar estrutura de diretórios: ${error.message}`);
-    }
-  }
-  
-  /**
    * Exportar dados de um motivo específico
    */
-  async exportReasonData(reason) {
+  async exportReasonData(reason, dirUri) {
     try {
       console.log(`EXPORT_SERVICE: Processando motivo ${reason.code} - ${reason.description}`);
       
@@ -120,22 +98,22 @@ class ExportService {
       
       console.log(`EXPORT_SERVICE: ${entries.length} entradas encontradas para motivo ${reason.code}`);
       
-      // Criar diretório específico do motivo
-      const reasonDir = await this.createReasonDirectory(reason.code);
-      
-      // Gerar nome do arquivo com data atual
+      // Gerar nome do arquivo
       const fileName = this.generateFileName(reason.code);
-      const filePath = `${reasonDir}${fileName}`;
       
       // Gerar conteúdo do arquivo
       const fileContent = this.generateFileContent(entries);
       
-      // Salvar arquivo
-      await FileSystem.writeAsStringAsync(filePath, fileContent, {
+      // Criar arquivo no diretório selecionado usando SAF
+      const fileUri = await FileSystem.StorageAccessFramework
+        .createFileAsync(dirUri, fileName, 'text/plain');
+      
+      // Salvar conteúdo no arquivo
+      await FileSystem.writeAsStringAsync(fileUri, fileContent, {
         encoding: FileSystem.EncodingType.UTF8
       });
       
-      console.log(`EXPORT_SERVICE: Arquivo criado: ${filePath}`);
+      console.log(`EXPORT_SERVICE: Arquivo criado: ${fileUri}`);
       
       // Marcar entradas como sincronizadas apenas após sucesso na gravação
       const entryIds = entries.map(entry => entry.id);
@@ -144,35 +122,13 @@ class ExportService {
       return {
         reason: reason.code,
         fileName: fileName,
-        filePath: filePath,
+        fileUri: fileUri,
         entriesCount: entries.length
       };
       
     } catch (error) {
       console.error(`EXPORT_SERVICE: Erro ao exportar motivo ${reason.code}:`, error);
       throw new Error(`Falha na exportação do motivo ${reason.code}: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Criar diretório específico do motivo
-   */
-  async createReasonDirectory(reasonCode) {
-    try {
-      const documentsDir = FileSystem.documentDirectory;
-      const reasonDir = `${documentsDir}inventario/motivos/motivo${reasonCode.padStart(2, '0')}/`;
-      
-      const dirInfo = await FileSystem.getInfoAsync(reasonDir);
-      if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(reasonDir, { intermediates: true });
-        console.log(`EXPORT_SERVICE: Diretório motivo${reasonCode.padStart(2, '0')}/ criado`);
-      }
-      
-      return reasonDir;
-      
-    } catch (error) {
-      console.error(`EXPORT_SERVICE: Erro ao criar diretório do motivo ${reasonCode}:`, error);
-      throw error;
     }
   }
   
@@ -208,7 +164,7 @@ class ExportService {
    * Exibir resultados da exportação
    */
   showExportResults(results) {
-    const { totalReasons, successfulExports, failedExports, exportedFiles, errors } = results;
+    const { totalReasons, successfulExports, failedExports, exportedFiles, errors, directoryUri } = results;
     
     if (successfulExports === 0 && failedExports === 0) {
       Alert.alert(
@@ -241,90 +197,13 @@ class ExportService {
       });
     }
     
-    message += `\nArquivos salvos em: Documentos/inventario/motivos/`;
+    message += `\nArquivos salvos em:\n${directoryUri}`;
     
     Alert.alert(
       successfulExports > 0 ? 'Exportação Realizada' : 'Exportação com Problemas',
       message,
       [{ text: 'OK' }]
     );
-  }
-  
-  /**
-   * Verificar estrutura de diretórios existente
-   */
-  async checkExistingStructure() {
-    try {
-      const documentsDir = FileSystem.documentDirectory;
-      const baseDir = `${documentsDir}inventario/`;
-      const motivosDir = `${baseDir}motivos/`;
-      
-      const baseDirInfo = await FileSystem.getInfoAsync(baseDir);
-      const motivosDirInfo = await FileSystem.getInfoAsync(motivosDir);
-      
-      return {
-        baseExists: baseDirInfo.exists,
-        motivosExists: motivosDirInfo.exists,
-        basePath: baseDir,
-        motivosPath: motivosDir
-      };
-      
-    } catch (error) {
-      console.error('EXPORT_SERVICE: Erro ao verificar estrutura:', error);
-      return {
-        baseExists: false,
-        motivosExists: false,
-        error: error.message
-      };
-    }
-  }
-  
-  /**
-   * Listar arquivos já exportados
-   */
-  async listExportedFiles() {
-    try {
-      const documentsDir = FileSystem.documentDirectory;
-      const motivosDir = `${documentsDir}inventario/motivos/`;
-      
-      const motivosDirInfo = await FileSystem.getInfoAsync(motivosDir);
-      if (!motivosDirInfo.exists) {
-        return [];
-      }
-      
-      const motivosDirContents = await FileSystem.readDirectoryAsync(motivosDir);
-      const files = [];
-      
-      for (const motiveFolder of motivosDirContents) {
-        const motiveFolderPath = `${motivosDir}${motiveFolder}/`;
-        const motiveFolderInfo = await FileSystem.getInfoAsync(motiveFolderPath);
-        
-        if (motiveFolderInfo.exists && motiveFolderInfo.isDirectory) {
-          const motiveFiles = await FileSystem.readDirectoryAsync(motiveFolderPath);
-          
-          for (const file of motiveFiles) {
-            if (file.endsWith('.txt')) {
-              const filePath = `${motiveFolderPath}${file}`;
-              const fileInfo = await FileSystem.getInfoAsync(filePath);
-              
-              files.push({
-                motiveFolder,
-                fileName: file,
-                filePath,
-                size: fileInfo.size,
-                modificationTime: fileInfo.modificationTime
-              });
-            }
-          }
-        }
-      }
-      
-      return files.sort((a, b) => b.modificationTime - a.modificationTime);
-      
-    } catch (error) {
-      console.error('EXPORT_SERVICE: Erro ao listar arquivos:', error);
-      return [];
-    }
   }
 }
 
