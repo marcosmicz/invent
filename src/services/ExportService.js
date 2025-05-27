@@ -210,3 +210,5 @@ class ExportService {
 // Exportar instância singleton
 export const exportService = new ExportService();
 export default exportService;
+
+//teste
