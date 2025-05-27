@@ -13,12 +13,11 @@ import {
 } from 'react-native';
 import { theme } from '../theme';
 import { expoDbManager } from '../database/expo-manager';
+import ProductAutocompleteInput from '../components/ProductAutocompleteInput';
 
 const HomeScreen = () => {
   // Estados para dados
   const [reasons, setReasons] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [filteredProducts, setFilteredProducts] = useState([]);
   
   // Estados para seleção
   const [selectedReason, setSelectedReason] = useState(null);
@@ -30,7 +29,6 @@ const HomeScreen = () => {
   
   // Estados para UI
   const [showReasonDropdown, setShowReasonDropdown] = useState(false);
-  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
 
   // Carregar dados iniciais
   useEffect(() => {
@@ -49,10 +47,7 @@ const HomeScreen = () => {
       setReasons(reasonsData);
       console.log('HOMESCREEN: Motivos carregados:', reasonsData.length);
       
-      // Carregar produtos
-      const productsData = await expoDbManager.fetchData('products');
-      setProducts(productsData);
-      console.log('HOMESCREEN: Produtos carregados:', productsData.length);
+      console.log('HOMESCREEN: Dados iniciais carregados');
       
     } catch (error) {
       console.error('HOMESCREEN: Erro ao carregar dados:', error);
@@ -60,43 +55,18 @@ const HomeScreen = () => {
     }
   };
 
-  // Buscar produtos conforme digitação (com debounce)
-  const handleCodeChange = (text) => {
-    setCode(text);
-    setSelectedProduct(null);
-    
-    if (text.trim().length === 0) {
-      setFilteredProducts([]);
-      setShowProductSuggestions(false);
-    }
+  // Handler para seleção de produto do novo componente
+  const handleProductSelect = (product) => {
+    setSelectedProduct(product);
+    setCode(product ? product.product_code : '');
   };
 
-  // useEffect para debounce na busca
-  useEffect(() => {
-    const searchProducts = async () => {
-      if (code.trim().length > 0) {
-        try {
-          const filtered = await expoDbManager.fetchData('products', code);
-          setFilteredProducts(filtered);
-          setShowProductSuggestions(filtered.length > 0);
-        } catch (error) {
-          console.error('HOMESCREEN: Erro ao buscar produtos:', error);
-          setFilteredProducts([]);
-          setShowProductSuggestions(false);
-        }
-      }
-    };
-
-    const timeoutId = setTimeout(searchProducts, 300); // Debounce de 300ms
-    return () => clearTimeout(timeoutId);
-  }, [code]);
-
-  // Selecionar produto da lista
-  const selectProduct = (product) => {
-    setSelectedProduct(product);
-    setCode(product.product_code);
-    setShowProductSuggestions(false);
-    setFilteredProducts([]);
+  // Handler para mudança de código do novo componente
+  const handleCodeChange = (text) => {
+    setCode(text);
+    if (!text.trim()) {
+      setSelectedProduct(null);
+    }
   };
 
   // Selecionar motivo
@@ -140,13 +110,10 @@ const HomeScreen = () => {
           {
             text: 'OK',
             onPress: () => {
-              // Limpar formulário
-              setSelectedReason(null);
+              // Limpar apenas campos de produto - manter motivo selecionado
               setSelectedProduct(null);
               setCode('');
               setQuantity('');
-              setFilteredProducts([]);
-              setShowProductSuggestions(false);
             }
           }
         ]
@@ -182,17 +149,6 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
-  // Render item das sugestões de produtos
-  const renderProductSuggestion = ({ item }) => (
-    <TouchableOpacity
-      style={styles.suggestionItem}
-      onPress={() => selectProduct(item)}
-      activeOpacity={0.7}
-    >
-      <Text style={styles.suggestionName}>{item.product_name}</Text>
-      <Text style={styles.suggestionCode}>({item.product_code})</Text>
-    </TouchableOpacity>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -252,38 +208,19 @@ const HomeScreen = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Campo Código - com Autocomplete */}
+          {/* Campo Código - com Novo Autocomplete */}
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Código</Text>
-            <RNTextInput
-              style={styles.textInput}
+            <ProductAutocompleteInput
               value={code}
-              onChangeText={handleCodeChange}
+              onProductSelect={handleProductSelect}
+              onCodeChange={handleCodeChange}
               placeholder="Digite o código do produto"
-              placeholderTextColor="#999"
-              onFocus={() => {
-                if (filteredProducts.length > 0) {
-                  setShowProductSuggestions(true);
-                }
-              }}
+              minChars={1}
+              maxSuggestions={5}
+              debounceMs={300}
+              showClearButton={true}
             />
-            
-            {/* Lista de sugestões de produtos */}
-            {showProductSuggestions && filteredProducts.length > 0 && (
-              <View style={styles.suggestionsContainer}>
-                {filteredProducts.slice(0, 5).map((item) => (
-                  <TouchableOpacity
-                    key={item.product_code}
-                    style={styles.suggestionItem}
-                    onPress={() => selectProduct(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.suggestionName}>{item.product_name}</Text>
-                    <Text style={styles.suggestionCode}>({item.product_code})</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
           </View>
 
           {/* Informações do produto */}
@@ -559,37 +496,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Sugestões de produtos
-  suggestionsContainer: {
-    position: 'absolute',
-    top: 72,
-    left: 0,
-    right: 0,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.outline,
-    borderRadius: theme.borderRadius.sm,
-    elevation: 4,
-    zIndex: 1000,
-  },
-  suggestionsList: {
-    maxHeight: 150,
-  },
-  suggestionItem: {
-    padding: theme.spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.outline,
-  },
-  suggestionName: {
-    fontSize: theme.typography.sizes.bodyMedium,
-    color: theme.colors.textPrimary,
-    fontFamily: theme.typography.fontFamily,
-  },
-  suggestionCode: {
-    fontSize: theme.typography.sizes.bodySmall,
-    color: theme.colors.textSecondary,
-    fontFamily: theme.typography.fontFamily,
-  },
 
   // Informações do produto
   productInfo: {
