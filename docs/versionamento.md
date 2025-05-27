@@ -75,7 +75,7 @@ npm view invent versions
 git checkout v1.0.0
 
 # Ver diferenças entre versões
-git diff v1.0.0 v1.1.0
+git diff v1.0.3 v1.0.4
 ```
 
 ## ⚠️ Cuidados Importantes

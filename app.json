@@ -2,7 +2,7 @@
   "expo": {
     "name": "invent",
     "slug": "invent",
-    "version": "v1.0.3",
+    "version": "v1.0.4",
     "plugins": [
       "expo-sqlite"
     ]
