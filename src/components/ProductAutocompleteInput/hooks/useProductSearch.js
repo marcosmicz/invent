@@ -80,10 +80,13 @@ const useProductSearch = (onProductSelect, options = {}) => {
   const selectProduct = useCallback((product) => {
     setSelectedProduct(product);
     setCode(product.product_code);
+    
+    // Garantir que as sugestões sejam ocultadas imediatamente
     setShowSuggestions(false);
     setFilteredProducts([]);
     setNoProductsFound(false);
     setSearchError(null);
+    setIsSearching(false);
     
     // Ocultar teclado
     Keyboard.dismiss();

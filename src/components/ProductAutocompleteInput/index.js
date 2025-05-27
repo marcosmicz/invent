@@ -89,7 +89,10 @@ const ProductAutocompleteInput = ({
 
   const handleInputBlur = () => {
     setIsFocused(false);
-    handleBlur();
+    // Delay maior para garantir que a seleção funcione antes de ocultar
+    setTimeout(() => {
+      handleBlur();
+    }, 200);
   };
 
   const handleClearPress = () => {

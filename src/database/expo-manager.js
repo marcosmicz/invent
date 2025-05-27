@@ -190,6 +190,16 @@ class ExpoSQLiteManager {
   }
 
   /**
+   * Normalizar string removendo acentos
+   */
+  normalizeString(str) {
+    return str
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '');
+  }
+
+  /**
    * Buscar dados genéricos (substitui fetchData)
    */
   async fetchData(table, searchTerm = '') {
@@ -200,8 +210,12 @@ class ExpoSQLiteManager {
       let params = [];
       
       if (searchTerm && table === 'products') {
-        query += ` WHERE product_code LIKE ? OR product_name LIKE ?`;
-        params = [`${searchTerm}%`, `%${searchTerm}%`];
+        // Busca insensível a acentos e case
+        const normalizedSearch = this.normalizeString(searchTerm);
+        
+        // Buscar todos os produtos e filtrar em memória para busca insensível a acentos
+        query = `SELECT * FROM ${table}`;
+        params = [];
       }
       
       if (table === 'reasons') {
@@ -220,6 +234,21 @@ class ExpoSQLiteManager {
         for (let i = 0; i < results.rows.length; i++) {
           data.push(results.rows.item(i));
         }
+      }
+      
+      // Filtrar produtos por busca insensível a acentos
+      if (searchTerm && table === 'products') {
+        const normalizedSearch = this.normalizeString(searchTerm);
+        const filteredData = data.filter(product => {
+          const normalizedCode = this.normalizeString(product.product_code || '');
+          const normalizedName = this.normalizeString(product.product_name || '');
+          
+          return normalizedCode.includes(normalizedSearch) || 
+                 normalizedName.includes(normalizedSearch);
+        });
+        
+        console.log(`EXPO-SQLITE: ${filteredData.length} produtos encontrados após filtro de acentos`);
+        return filteredData;
       }
       
       console.log(`EXPO-SQLITE: ${data.length} registros encontrados na tabela ${table}`);
